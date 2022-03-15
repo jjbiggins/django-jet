@@ -87,7 +87,7 @@ class DashboardModule(object):
             self.load_from_model()
 
     def fullname(self):
-        return self.__module__ + "." + self.__class__.__name__
+        return f'{self.__module__}.{self.__class__.__name__}'
 
     def load_settings(self, settings):
         """
@@ -112,8 +112,7 @@ class DashboardModule(object):
         pass
 
     def dump_settings(self, settings=None):
-        settings = settings or self.settings_dict()
-        if settings:
+        if settings := settings or self.settings_dict():
             return json.dumps(settings, cls=LazyDateTimeEncoder)
         else:
             return ''
@@ -325,16 +324,22 @@ class AppList(DashboardModule):
         for app in app_list:
             app_name = app.get('app_label', app.get('name', ''))
             app['models'] = filter(
-                lambda model: self.models is None or ('%s.%s' % (app_name, model['object_name'])) in self.models or ('%s.*' % app_name) in self.models,
-                app['models']
+                lambda model: self.models is None
+                or f"{app_name}.{model['object_name']}" in self.models
+                or f'{app_name}.*' in self.models,
+                app['models'],
             )
+
             app['models'] = filter(
-                lambda model: self.exclude is None or (('%s.%s' % (app_name, model['object_name'])) not in self.exclude and ('%s.*' % app_name) not in self.exclude),
-                app['models']
+                lambda model: self.exclude is None
+                or f"{app_name}.{model['object_name']}" not in self.exclude
+                and f'{app_name}.*' not in self.exclude,
+                app['models'],
             )
+
             app['models'] = list(app['models'])
 
-            if self.hide_empty and len(list(app['models'])) == 0:
+            if self.hide_empty and not list(app['models']):
                 app_to_remove.append(app)
 
         for app in app_to_remove:
@@ -398,13 +403,19 @@ class ModelList(DashboardModule):
         for app in app_list:
             app_name = app.get('app_label', app.get('name', ''))
             app['models'] = filter(
-                lambda model: self.models is None or ('%s.%s' % (app_name, model['object_name'])) in self.models or ('%s.*' % app_name) in self.models,
-                app['models']
+                lambda model: self.models is None
+                or f"{app_name}.{model['object_name']}" in self.models
+                or f'{app_name}.*' in self.models,
+                app['models'],
             )
+
             app['models'] = filter(
-                lambda model: self.exclude is None or (('%s.%s' % (app_name, model['object_name'])) not in self.exclude and ('%s.*' % app_name) not in self.exclude),
-                app['models']
+                lambda model: self.exclude is None
+                or f"{app_name}.{model['object_name']}" not in self.exclude
+                and f'{app_name}.*' not in self.exclude,
+                app['models'],
             )
+
             app['models'] = list(app['models'])
 
             models.extend(app['models'])
@@ -498,10 +509,7 @@ class RecentActions(DashboardModule):
                 except:
                     raise ValueError('Invalid contenttype: "%s"' % contenttype)
 
-                if qset is None:
-                    qset = current_qset
-                else:
-                    qset = qset | current_qset
+                qset = current_qset if qset is None else qset | current_qset
             return qset
 
         qs = LogEntry.objects
@@ -591,7 +599,7 @@ class Feed(DashboardModule):
 
                 for entry in entries:
                     try:
-                        entry.date = datetime.date(*entry.published_parsed[0:3])
+                        entry.date = datetime.date(*entry.published_parsed[:3])
                     except:
                         pass
 

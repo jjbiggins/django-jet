@@ -104,16 +104,12 @@ class Dashboard(object):
     def load_module(self, module_fullname):
         package, module_name = module_fullname.rsplit('.', 1)
         package = import_module(package)
-        module = getattr(package, module_name)
-
-        return module
+        return getattr(package, module_name)
 
     def create_initial_module_models(self, user):
         module_models = []
 
-        i = 0
-
-        for module in self.children:
+        for i, module in enumerate(self.children):
             column = module.column if module.column is not None else i % self.columns
             order = module.order if module.order is not None else int(i / self.columns)
 
@@ -127,8 +123,6 @@ class Dashboard(object):
                 settings=module.dump_settings(),
                 children=module.dump_children()
             ))
-            i += 1
-
         return module_models
 
     def load_modules(self):
@@ -196,10 +190,10 @@ class Dashboard(object):
 
 class AppIndexDashboard(Dashboard):
     def get_app_content_types(self):
-        return self.app_label + '.*',
+        return (f'{self.app_label}.*', )
 
     def models(self):
-        return self.app_label + '.*',
+        return (f'{self.app_label}.*', )
 
 
 class DefaultIndexDashboard(Dashboard):
@@ -211,21 +205,26 @@ class DefaultIndexDashboard(Dashboard):
 
         site_name = get_admin_site_name(context)
         # append a link list module for "quick links"
-        self.children.append(modules.LinkList(
-            _('Quick links'),
-            layout='inline',
-            draggable=False,
-            deletable=False,
-            collapsible=False,
-            children=[
-                [_('Return to site'), '/'],
-                [_('Change password'),
-                 reverse('%s:password_change' % site_name)],
-                [_('Log out'), reverse('%s:logout' % site_name)],
-            ],
-            column=0,
-            order=0
-        ))
+        self.children.append(
+            modules.LinkList(
+                _('Quick links'),
+                layout='inline',
+                draggable=False,
+                deletable=False,
+                collapsible=False,
+                children=[
+                    [_('Return to site'), '/'],
+                    [
+                        _('Change password'),
+                        reverse(f'{site_name}:password_change'),
+                    ],
+                    [_('Log out'), reverse(f'{site_name}:logout')],
+                ],
+                column=0,
+                order=0,
+            )
+        )
+
 
         # append an app list module for "Applications"
         self.children.append(modules.AppList(

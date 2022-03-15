@@ -120,7 +120,9 @@ class ModelLookupForm(forms.Form):
         content_type = ContentType.objects.get_for_model(self.model_cls)
         permission = Permission.objects.filter(content_type=content_type, codename__startswith='change_').first()
 
-        if not self.request.user.has_perm('{}.{}'.format(data['app_label'], permission.codename)):
+        if not self.request.user.has_perm(
+            f"{data['app_label']}.{permission.codename}"
+        ):
             raise ValidationError('error')
 
         return data
@@ -131,7 +133,11 @@ class ModelLookupForm(forms.Form):
         if self.cleaned_data['q']:
             if getattr(self.model_cls, 'autocomplete_search_fields', None):
                 search_fields = self.model_cls.autocomplete_search_fields()
-                filter_data = [Q((field + '__icontains', self.cleaned_data['q'])) for field in search_fields]
+                filter_data = [
+                    Q((f'{field}__icontains', self.cleaned_data['q']))
+                    for field in search_fields
+                ]
+
                 # if self.cleaned_data['object_id']:
                 #     filter_data.append(Q(pk=self.cleaned_data['object_id']))
                 qs = qs.filter(reduce(operator.or_, filter_data)).distinct()

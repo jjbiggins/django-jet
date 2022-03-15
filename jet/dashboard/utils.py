@@ -8,13 +8,12 @@ def get_current_dashboard(location):
     elif location == 'app_index':
         path = settings.JET_APP_INDEX_DASHBOARD
     else:
-        raise ValueError('Unknown dashboard location: %s' % location)
+        raise ValueError(f'Unknown dashboard location: {location}')
 
     module, cls = path.rsplit('.', 1)
 
     try:
         module = import_module(module)
-        index_dashboard_cls = getattr(module, cls)
-        return index_dashboard_cls
+        return getattr(module, cls)
     except ImportError:
         return None

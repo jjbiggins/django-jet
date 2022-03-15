@@ -40,7 +40,7 @@ class YandexMetrikaClient:
         self.access_token = access_token
 
     def request(self, base_url, url, data=None, headers=None):
-        url = '%s%s' % (base_url, url)
+        url = f'{base_url}{url}'
 
         if data is not None:
             data = urlencode(data).encode()
@@ -80,7 +80,7 @@ class YandexMetrikaClient:
     def api_request(self, url, data=None):
         headers = None
         if self.access_token is not None:
-            headers = {'Authorization': 'OAuth %s' % self.access_token}
+            headers = {'Authorization': f'OAuth {self.access_token}'}
         return self.request(self.API_BASE_URL, url, data, headers)
 
     def api_counters_request(self):
@@ -89,12 +89,9 @@ class YandexMetrikaClient:
     def api_stat_traffic_summary(self, counter, date1, date2, group=None):
         if group is None:
             group = 'day'
-        return self.api_request('stat/traffic/summary.json?id=%s&date1=%s&date2=%s&group=%s' % (
-            counter,
-            date1.strftime('%Y%m%d'),
-            date2.strftime('%Y%m%d'),
-            group
-        ))
+        return self.api_request(
+            f"stat/traffic/summary.json?id={counter}&date1={date1.strftime('%Y%m%d')}&date2={date2.strftime('%Y%m%d')}&group={group}"
+        )
 
 
 class AccessTokenWidget(Widget):
@@ -136,11 +133,11 @@ class YandexMetrikaSettingsForm(forms.Form):
     def set_counter_choices(self, module):
         counters = module.counters()
         if counters is not None:
-            self.fields['counter'].choices = (('', '-- %s --' % force_text(_('none'))),)
+            self.fields['counter'].choices = (('', f"-- {force_text(_('none'))} --"), )
             self.fields['counter'].choices.extend(map(lambda x: (x['id'], x['site']), counters))
         else:
             label = force_text(_('grant access first')) if module.access_token is None else force_text(_('counters loading failed'))
-            self.fields['counter'].choices = (('', '-- %s -- ' % label),)
+            self.fields['counter'].choices = (('', f'-- {label} -- '), )
 
 
 class YandexMetrikaChartSettingsForm(YandexMetrikaSettingsForm):
@@ -201,17 +198,12 @@ class YandexMetrikaBase(DashboardModule):
         client = YandexMetrikaClient(self.access_token)
         counters, exception = client.api_counters_request()
 
-        if counters is not None:
-            return counters['counters']
-        else:
-            return None
+        return counters['counters'] if counters is not None else None
 
     def format_grouped_date(self, date, group):
         if group == 'week':
-            date = u'%s — %s' % (
-                (date - datetime.timedelta(days=7)).strftime('%d.%m'),
-                date.strftime('%d.%m')
-            )
+            date = f"{(date - datetime.timedelta(days=7)).strftime('%d.%m')} — {date.strftime('%d.%m')}"
+
         elif group == 'month':
             date = date.strftime('%b, %Y')
         else:
@@ -229,20 +221,20 @@ class YandexMetrikaBase(DashboardModule):
             return True
 
     def api_stat_traffic_summary(self, group=None):
-        if self.counter_attached():
-            date1 = datetime.datetime.now() - datetime.timedelta(days=self.period)
-            date2 = datetime.datetime.now()
+        if not self.counter_attached():
+            return
+        date1 = datetime.datetime.now() - datetime.timedelta(days=self.period)
+        date2 = datetime.datetime.now()
 
-            client = YandexMetrikaClient(self.access_token)
-            result, exception = client.api_stat_traffic_summary(self.counter, date1, date2, group)
+        client = YandexMetrikaClient(self.access_token)
+        result, exception = client.api_stat_traffic_summary(self.counter, date1, date2, group)
 
-            if exception is not None:
-                error = _('API request failed.')
-                if isinstance(exception, HTTPError) and exception.code == 403:
-                    error += _(' Try to <a href="%s">revoke and grant access</a> again') % reverse('jet-dashboard:update_module', kwargs={'pk': self.model.pk})
-                self.error = mark_safe(error)
-            else:
-                return result
+        if exception is None:
+            return result
+        error = _('API request failed.')
+        if isinstance(exception, HTTPError) and exception.code == 403:
+            error += _(' Try to <a href="%s">revoke and grant access</a> again') % reverse('jet-dashboard:update_module', kwargs={'pk': self.model.pk})
+        self.error = mark_safe(error)
 
 
 class YandexMetrikaVisitorsTotals(YandexMetrikaBase):

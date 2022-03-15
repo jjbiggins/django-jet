@@ -84,8 +84,6 @@ try:
             css = [
                 'style.css',
             ]
-            return forms.Media(
-                css={'all': ['range_filter/css/%s' % path for path in css]}
-            )
+            return forms.Media(css={'all': [f'range_filter/css/{path}' for path in css]})
 except ImportError:
     pass

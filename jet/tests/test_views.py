@@ -25,7 +25,7 @@ class ViewsTestCase(TestCase):
 
     def test_module_update_view(self):
         title = 'Quick links Test'
-        new_title = title + '2'
+        new_title = f'{title}2'
         new_layout = 'stacked'
         module = UserDashboardModule.objects.create(
             title=title,

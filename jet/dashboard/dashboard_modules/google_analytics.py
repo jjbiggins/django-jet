@@ -85,8 +85,7 @@ class GoogleAnalyticsClient:
 
     def get_oauth_authorize_url(self, state=''):
         self.FLOW.params['state'] = state
-        authorize_url = self.FLOW.step1_get_authorize_url()
-        return authorize_url
+        return self.FLOW.step1_get_authorize_url()
 
     def set_credential(self, credential):
         self.credential = credential
@@ -120,21 +119,27 @@ class GoogleAnalyticsClient:
 
         if group == 'day':
             dimensions = 'ga:date'
-        elif group == 'week':
-            dimensions = 'ga:year,ga:week'
         elif group == 'month':
             dimensions = 'ga:year,ga:month'
+        elif group == 'week':
+            dimensions = 'ga:year,ga:week'
         else:
             dimensions = ''
 
         try:
-            data = self.analytics_service.data().ga().get(
-                ids='ga:' + profile_id,
-                start_date=date1.strftime('%Y-%m-%d'),
-                end_date=date2.strftime('%Y-%m-%d'),
-                metrics='ga:users,ga:sessions,ga:pageviews',
-                dimensions=dimensions
-            ).execute()
+            data = (
+                self.analytics_service.data()
+                .ga()
+                .get(
+                    ids=f'ga:{profile_id}',
+                    start_date=date1.strftime('%Y-%m-%d'),
+                    end_date=date2.strftime('%Y-%m-%d'),
+                    metrics='ga:users,ga:sessions,ga:pageviews',
+                    dimensions=dimensions,
+                )
+                .execute()
+            )
+
 
             return data, None
         except TypeError as e:
@@ -183,11 +188,11 @@ class GoogleAnalyticsSettingsForm(forms.Form):
     def set_counter_choices(self, module):
         counters = module.counters()
         if counters is not None:
-            self.fields['counter'].choices = (('', '-- %s --' % force_text(_('none'))),)
+            self.fields['counter'].choices = (('', f"-- {force_text(_('none'))} --"), )
             self.fields['counter'].choices.extend(map(lambda x: (x['id'], x['websiteUrl']), counters))
         else:
             label = force_text(_('grant access first')) if module.credential is None else force_text(_('counters loading failed'))
-            self.fields['counter'].choices = (('', '-- %s -- ' % label),)
+            self.fields['counter'].choices = (('', f'-- {label} -- '), )
 
 
 class GoogleAnalyticsChartSettingsForm(GoogleAnalyticsSettingsForm):
@@ -254,24 +259,21 @@ class GoogleAnalyticsBase(DashboardModule):
 
     def get_grouped_date(self, data, group):
         if group == 'week':
-            date = datetime.datetime.strptime(
-                '%s-%s-%s' % (data['ga_year'], data['ga_week'], '0'),
-                '%Y-%W-%w'
+            return datetime.datetime.strptime(
+                f"{data['ga_year']}-{data['ga_week']}-0", '%Y-%W-%w'
             )
+
         elif group == 'month':
-            date = datetime.datetime.strptime(data['ga_year'] + data['ga_month'], '%Y%m')
+            return datetime.datetime.strptime(data['ga_year'] + data['ga_month'], '%Y%m')
         else:
-            date = datetime.datetime.strptime(data['ga_date'], '%Y%m%d')
-        return date
+            return datetime.datetime.strptime(data['ga_date'], '%Y%m%d')
 
     def format_grouped_date(self, data, group):
         date = self.get_grouped_date(data, group)
 
         if group == 'week':
-            date = u'%s — %s' % (
-                (date - datetime.timedelta(days=6)).strftime('%d.%m'),
-                date.strftime('%d.%m')
-            )
+            date = f"{(date - datetime.timedelta(days=6)).strftime('%d.%m')} — {date.strftime('%d.%m')}"
+
         elif group == 'month':
             date = date.strftime('%b, %Y')
         else:
@@ -381,12 +383,11 @@ class GoogleAnalyticsVisitorsChart(GoogleAnalyticsBase):
         if result is not None:
             try:
                 for data in result['rows']:
-                    row_data = {}
+                    row_data = {
+                        column['name'].replace(':', '_'): data[i]
+                        for i, column in enumerate(result['columnHeaders'])
+                    }
 
-                    i = 0
-                    for column in result['columnHeaders']:
-                        row_data[column['name'].replace(':', '_')] = data[i]
-                        i += 1
 
                     date = self.get_grouped_date(row_data, self.group)
                     self.children.append((date, row_data[self.show.replace(':', '_')]))
@@ -431,12 +432,11 @@ class GoogleAnalyticsPeriodVisitors(GoogleAnalyticsBase):
         if result is not None:
             try:
                 for data in reversed(result['rows']):
-                    row_data = {}
+                    row_data = {
+                        column['name'].replace(':', '_'): data[i]
+                        for i, column in enumerate(result['columnHeaders'])
+                    }
 
-                    i = 0
-                    for column in result['columnHeaders']:
-                        row_data[column['name'].replace(':', '_')] = data[i]
-                        i += 1
 
                     date = self.format_grouped_date(row_data, self.group)
                     self.children.append((date, row_data))

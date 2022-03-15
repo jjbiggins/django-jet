@@ -49,9 +49,7 @@ def jet_get_menu(context):
 
 @assignment_tag
 def jet_get_bookmarks(user):
-    if user is None:
-        return None
-    return Bookmark.objects.filter(user=user.pk)
+    return None if user is None else Bookmark.objects.filter(user=user.pk)
 
 
 @register.filter
@@ -61,8 +59,9 @@ def jet_is_checkbox(field):
 
 @register.filter
 def jet_select2_lookups(field):
-    if hasattr(field, 'field') and \
-            (isinstance(field.field, ModelChoiceField) or isinstance(field.field, ModelMultipleChoiceField)):
+    if hasattr(field, 'field') and isinstance(
+        field.field, (ModelChoiceField, ModelMultipleChoiceField)
+    ):
         qs = field.field.queryset
         model = qs.model
 
@@ -113,12 +112,16 @@ def jet_select2_lookups(field):
 
 @assignment_tag(takes_context=True)
 def jet_get_current_theme(context):
-    if 'request' in context and 'JET_THEME' in context['request'].COOKIES:
+    if (
+        'request' in context
+        and 'JET_THEME' in context['request'].COOKIES
+        and isinstance(settings.JET_THEMES, list)
+        and len(settings.JET_THEMES) > 0
+    ):
         theme = context['request'].COOKIES['JET_THEME']
-        if isinstance(settings.JET_THEMES, list) and len(settings.JET_THEMES) > 0:
-            for conf_theme in settings.JET_THEMES:
-                if isinstance(conf_theme, dict) and conf_theme.get('theme') == theme:
-                    return theme
+        for conf_theme in settings.JET_THEMES:
+            if isinstance(conf_theme, dict) and conf_theme.get('theme') == theme:
+                return theme
     return settings.JET_DEFAULT_THEME
 
 
@@ -134,10 +137,7 @@ def jet_get_current_version():
 
 @register.filter
 def jet_append_version(url):
-    if '?' in url:
-        return '%s&v=%s' % (url, VERSION)
-    else:
-        return '%s?v=%s' % (url, VERSION)
+    return f'{url}&v={VERSION}' if '?' in url else f'{url}?v={VERSION}'
 
 
 @assignment_tag
@@ -184,14 +184,14 @@ def jet_sibling_object(context, next):
     if sibling_object is None:
         return
 
-    url = reverse('%s:%s_%s_change' % (
-        admin_site.name,
-        model._meta.app_label,
-        model._meta.model_name
-    ), args=(sibling_object.pk,))
+    url = reverse(
+        f'{admin_site.name}:{model._meta.app_label}_{model._meta.model_name}_change',
+        args=(sibling_object.pk,),
+    )
+
 
     if preserved_filters_plain != '':
-        url += '?' + preserved_filters_plain
+        url += f'?{preserved_filters_plain}'
 
     return {
         'label': str(sibling_object),

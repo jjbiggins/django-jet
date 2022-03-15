@@ -27,9 +27,10 @@ class UpdateDashboardModulesForm(forms.Form):
             for module in modules:
                 db_module = UserDashboardModule.objects.get(
                     user=self.request.user.pk,
-                    app_label=data['app_label'] if data['app_label'] else None,
-                    pk=module['id']
+                    app_label=data['app_label'] or None,
+                    pk=module['id'],
                 )
+
 
                 column = module['column']
                 order = module['order']
@@ -155,7 +156,7 @@ class ResetDashboardForm(forms.Form):
 
     def clean(self):
         data = super(ResetDashboardForm, self).clean()
-        data['app_label'] = data['app_label'] if data['app_label'] else None
+        data['app_label'] = data['app_label'] or None
 
         if not user_is_authenticated(self.request.user) or not self.request.user.is_staff:
             raise ValidationError('error')
