@@ -127,7 +127,7 @@ def get_app_list(context, order=True):
 def get_admin_site(context):
     try:
         current_resolver = resolve(context.get('request').path)
-        index_resolver = resolve(reverse('%s:index' % current_resolver.namespaces[0]))
+        index_resolver = resolve(reverse(f'{current_resolver.namespaces[0]}:index'))
 
         if hasattr(index_resolver.func, 'admin_site'):
             return index_resolver.func.admin_site
@@ -147,7 +147,7 @@ def get_admin_site_name(context):
 
 class LazyDateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, datetime.datetime) or isinstance(obj, datetime.date):
+        if isinstance(obj, (datetime.datetime, datetime.date)):
             return obj.isoformat()
         elif isinstance(obj, Promise):
             return force_text(obj)
@@ -168,8 +168,7 @@ class SuccessMessageMixin(object):
 
     def form_valid(self, form):
         response = super(SuccessMessageMixin, self).form_valid(form)
-        success_message = self.get_success_message(form.cleaned_data)
-        if success_message:
+        if success_message := self.get_success_message(form.cleaned_data):
             messages.success(self.request, success_message)
         return response
 
@@ -184,11 +183,10 @@ def get_model_queryset(admin_site, model, request, preserved_filters=None):
         return
 
     try:
-        changelist_url = reverse('%s:%s_%s_changelist' % (
-            admin_site.name,
-            model._meta.app_label,
-            model._meta.model_name
-        ))
+        changelist_url = reverse(
+            f'{admin_site.name}:{model._meta.app_label}_{model._meta.model_name}_changelist'
+        )
+
     except NoReverseMatch:
         return
 
@@ -198,13 +196,9 @@ def get_model_queryset(admin_site, model, request, preserved_filters=None):
         changelist_filters = preserved_filters.get('_changelist_filters')
 
     if changelist_filters:
-        changelist_url += '?' + changelist_filters
+        changelist_url += f'?{changelist_filters}'
 
-    if model_admin:
-        queryset = model_admin.get_queryset(request)
-    else:
-        queryset = model.objects
-
+    queryset = model_admin.get_queryset(request) if model_admin else model.objects
     list_display = model_admin.get_list_display(request)
     list_display_links = model_admin.get_list_display_links(request, list_display)
     list_filter = model_admin.get_list_filter(request)
@@ -245,15 +239,17 @@ def get_possible_language_codes():
     language_code = translation.get_language()
 
     language_code = language_code.replace('_', '-').lower()
-    language_codes = []
-
     # making dialect part uppercase
     split = language_code.split('-', 2)
     if len(split) == 2:
-        language_code = '%s-%s' % (split[0].lower(), split[1].upper()) if split[0] != split[1] else split[0]
+        language_code = (
+            f'{split[0].lower()}-{split[1].upper()}'
+            if split[0] != split[1]
+            else split[0]
+        )
 
-    language_codes.append(language_code)
 
+    language_codes = [language_code]
     # adding language code without dialect part
     if len(split) == 2:
         language_codes.append(split[0].lower())
@@ -359,7 +355,7 @@ def get_menu_items(context):
             if not app_label:
                 if 'label' not in data:
                     raise Exception('Custom menu items should at least have \'label\' or \'app_label\' key')
-                app_label = 'custom_%s' % slugify(data['label'], allow_unicode=True)
+                app_label = f"custom_{slugify(data['label'], allow_unicode=True)}"
 
             if app_label in original_app_list:
                 item = original_app_list[app_label].copy()
@@ -462,7 +458,8 @@ def context_to_dict(context):
 
 
 def user_is_authenticated(user):
-    if not hasattr(user.is_authenticated, '__call__'):
-        return user.is_authenticated
-    else:
-        return user.is_authenticated()
+    return (
+        user.is_authenticated()
+        if hasattr(user.is_authenticated, '__call__')
+        else user.is_authenticated
+    )
